@@ -1,0 +1,23 @@
+{
+  "name": "nook-moments-diary",
+  "version": "1.0.0",
+  "description": "Nook — An intimate moments diary and friends-only memory journal Progressive Web App (PWA)",
+  "main": "index.html",
+  "scripts": {
+    "dev": "npx serve -l 3000 .",
+    "start": "npx serve -l 3000 .",
+    "preview": "npx serve -l 3000 ."
+  },
+  "keywords": [
+    "pwa",
+    "moments-diary",
+    "photo-journal",
+    "bereal-alternative",
+    "locket-widget",
+    "memories",
+    "close-friends",
+    "offline-first"
+  ],
+  "author": "gope6338-cyber",
+  "license": "MIT"
+}

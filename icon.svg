@@ -1,0 +1,72 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="100%" height="100%">
+  <defs>
+    <!-- Background Gradient -->
+    <linearGradient id="bgGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#141926" />
+      <stop offset="50%" stop-color="#0E131F" />
+      <stop offset="100%" stop-color="#070A10" />
+    </linearGradient>
+
+    <!-- Glowing Accent Ring -->
+    <linearGradient id="accentGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#FF6B6B" />
+      <stop offset="35%" stop-color="#FF9F43" />
+      <stop offset="70%" stop-color="#A55EEA" />
+      <stop offset="100%" stop-color="#45AAF2" />
+    </linearGradient>
+
+    <!-- Warm Aperture Gradient -->
+    <radialGradient id="lensGlow" cx="50%" cy="50%" r="50%">
+      <stop offset="0%" stop-color="#FFA07A" stop-opacity="0.8" />
+      <stop offset="45%" stop-color="#EE5253" stop-opacity="0.5" />
+      <stop offset="75%" stop-color="#5F27CD" stop-opacity="0.2" />
+      <stop offset="100%" stop-color="#000000" stop-opacity="0" />
+    </radialGradient>
+
+    <!-- Filter for soft neon glow -->
+    <filter id="glow" x="-20%" y="-20%" width="140%" height="140%">
+      <feGaussianBlur stdDeviation="16" result="blur" />
+      <feComposite in="SourceGraphic" in2="blur" operator="over" />
+    </filter>
+    <filter id="softShadow" x="-10%" y="-10%" width="120%" height="125%">
+      <feDropShadow dx="0" dy="12" stdDeviation="16" flood-color="#000000" flood-opacity="0.6"/>
+    </filter>
+  </defs>
+
+  <!-- Squircle Base -->
+  <rect x="24" y="24" width="464" height="464" rx="112" fill="url(#bgGrad)" stroke="rgba(255,255,255,0.08)" stroke-width="4" filter="url(#softShadow)"/>
+
+  <!-- Subtle Inner Ambient Mesh Glow -->
+  <circle cx="160" cy="140" r="160" fill="#FF6B6B" opacity="0.12" filter="url(#glow)"/>
+  <circle cx="360" cy="360" r="180" fill="#A55EEA" opacity="0.14" filter="url(#glow)"/>
+
+  <!-- Camera Outer Frame / Nook Arch -->
+  <rect x="106" y="126" width="300" height="260" rx="60" fill="none" stroke="url(#accentGrad)" stroke-width="12" stroke-linecap="round" opacity="0.95"/>
+
+  <!-- Flash LED Dot -->
+  <circle cx="346" cy="180" r="16" fill="#FF9F43" filter="url(#glow)"/>
+  <circle cx="346" cy="180" r="8" fill="#FFF9E6"/>
+
+  <!-- Viewfinder Notch on top -->
+  <path d="M 196 126 C 196 98, 220 90, 246 90 L 266 90 C 292 90, 316 98, 316 126" fill="none" stroke="url(#accentGrad)" stroke-width="12" stroke-linecap="round"/>
+
+  <!-- Center Lens Glow Aura -->
+  <circle cx="256" cy="260" r="95" fill="url(#lensGlow)"/>
+
+  <!-- Lens Outer Ring -->
+  <circle cx="256" cy="260" r="80" fill="#131927" stroke="url(#accentGrad)" stroke-width="10"/>
+
+  <!-- Aperture Blades (Stylized Warm Moments Sparkle) -->
+  <circle cx="256" cy="260" r="48" fill="#0C0F17" stroke="rgba(255,255,255,0.15)" stroke-width="4"/>
+
+  <!-- Luminous Heart Spark in Core -->
+  <path d="M 256 244 
+           C 252 236, 240 234, 234 240 
+           C 226 248, 230 258, 256 274 
+           C 282 258, 286 248, 278 240 
+           C 272 234, 260 236, 256 244 Z" 
+        fill="#FF6B6B" filter="url(#glow)"/>
+
+  <!-- Little Sparkle Star in top right of base -->
+  <path d="M 390 90 Q 402 90 402 78 Q 402 90 414 90 Q 402 90 402 102 Q 402 90 390 90 Z" fill="#FFD166"/>
+</svg>

@@ -1,0 +1,47 @@
+{
+  "name": "Nook — Moments Diary",
+  "short_name": "Nook",
+  "description": "An intimate moments diary & friends-only memory journal. Capture raw, genuine moments and cherish them with your circle.",
+  "start_url": "./index.html",
+  "scope": "./",
+  "display": "standalone",
+  "display_override": ["window-controls-overlay", "standalone"],
+  "orientation": "portrait-primary",
+  "background_color": "#0B0F17",
+  "theme_color": "#121826",
+  "icons": [
+    {
+      "src": "icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    },
+    {
+      "src": "icon.svg",
+      "sizes": "512x512",
+      "type": "image/svg+xml",
+      "purpose": "maskable"
+    }
+  ],
+  "categories": [
+    "lifestyle",
+    "social",
+    "photo"
+  ],
+  "shortcuts": [
+    {
+      "name": "Capture Moment",
+      "short_name": "Capture",
+      "description": "Quickly snap a new moment to your diary",
+      "url": "./index.html?action=capture",
+      "icons": [{ "src": "icon.svg", "sizes": "any" }]
+    },
+    {
+      "name": "View Memories",
+      "short_name": "Memories",
+      "description": "Browse your memory calendar",
+      "url": "./index.html?tab=memories",
+      "icons": [{ "src": "icon.svg", "sizes": "any" }]
+    }
+  ]
+}

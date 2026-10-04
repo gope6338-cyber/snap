@@ -1,0 +1,378 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+  <title>Nook — Moments Diary & Friends Memory Journal</title>
+  <meta name="description" content="An intimate moments diary & friends-only memory journal. Capture genuine, raw moments and cherish memories with those who matter most.">
+  <meta name="theme-color" content="#121826">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="Nook">
+  
+  <link rel="icon" type="image/svg+xml" href="icon.svg">
+  <link rel="apple-touch-icon" href="icon.svg">
+  <link rel="manifest" href="manifest.json">
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <div class="app-container">
+    <div class="device-viewport" id="appViewport">
+      
+      <!-- Top Sticky App Bar -->
+      <header class="top-bar">
+        <div class="top-bar-row">
+          <a href="#" class="brand-wrapper" id="brandHomeBtn" aria-label="Nook Home">
+            <div class="brand-icon">
+              <svg viewBox="0 0 512 512" fill="none">
+                <rect x="30" y="30" width="452" height="452" rx="110" fill="#0C101A"/>
+                <rect x="120" y="140" width="272" height="232" rx="50" stroke="#FF6B6B" stroke-width="20"/>
+                <circle cx="256" cy="256" r="72" stroke="#FF9F43" stroke-width="18"/>
+                <circle cx="256" cy="256" r="28" fill="#FF5E7E"/>
+              </svg>
+            </div>
+            <h1 class="brand-title">Nook</h1>
+          </a>
+
+          <div class="top-bar-actions">
+            <div class="streak-badge" id="streakBadge" title="Consecutive days capturing moments">
+              <span>🔥</span>
+              <span id="streakCount">5 Days</span>
+            </div>
+            <button class="btn-icon" id="btnOpenSearch" aria-label="Search moments" title="Search moments">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <circle cx="11" cy="11" r="8"></circle>
+                <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+              </svg>
+            </button>
+            <button class="btn-icon" id="btnOpenSettings" aria-label="Settings & Backup" title="Settings & Backup">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <circle cx="12" cy="12" r="3"></circle>
+                <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path>
+              </svg>
+            </button>
+          </div>
+        </div>
+
+        <!-- Spaces Filter Tabs -->
+        <nav class="spaces-bar" aria-label="Spaces">
+          <button class="space-tab active" data-space="all">✨ All Moments</button>
+          <button class="space-tab" data-space="friends">👥 Close Friends</button>
+          <button class="space-tab" data-space="private">🔒 Secret Diary</button>
+          <button class="space-tab" data-space="favorites">⭐️ Favorites</button>
+        </nav>
+
+        <!-- Quick Mood / Type Filter Chips -->
+        <div class="filters-bar" id="filtersBar">
+          <button class="filter-chip active" data-filter="all">All</button>
+          <button class="filter-chip" data-filter="today">Today</button>
+          <button class="filter-chip" data-filter="mood-golden">🌅 Golden Hour</button>
+          <button class="filter-chip" data-filter="mood-cozy">☕ Cozy Vibes</button>
+          <button class="filter-chip" data-filter="mood-peace">🌿 Quiet Mind</button>
+          <button class="filter-chip" data-filter="mood-night">🌙 Late Night</button>
+        </div>
+      </header>
+
+      <!-- Main Scrollable Screen -->
+      <main class="main-content" id="mainContent">
+        
+        <!-- Daily Inspiration / Prompt Banner -->
+        <section class="prompt-banner" id="promptBanner">
+          <div class="prompt-info">
+            <span class="prompt-tag">Today's Prompt</span>
+            <p class="prompt-text" id="dailyPromptText">"What was a quiet little victory you celebrated today?"</p>
+          </div>
+          <button class="btn-prompt-snap" id="btnSnapPrompt" title="Answer today's prompt">
+            Snap Now
+          </button>
+        </section>
+
+        <!-- Primary Feed Stream View -->
+        <section class="moments-feed" id="momentsFeedView" aria-label="Moments Feed">
+          <!-- Dynamically populated by app.js -->
+        </section>
+
+        <!-- Calendar Memories View (Hidden by default) -->
+        <section class="calendar-view-container" id="calendarView" style="display: none;" aria-label="Memories Calendar">
+          <div class="calendar-header">
+            <button class="btn-icon" id="btnCalPrev" aria-label="Previous Month">‹</button>
+            <h2 class="calendar-month-title" id="calendarMonthTitle">October 2026</h2>
+            <button class="btn-icon" id="btnCalNext" aria-label="Next Month">›</button>
+          </div>
+          <div class="calendar-grid" id="calendarGrid">
+            <!-- Day labels and day cells populated by app.js -->
+          </div>
+          <div id="calendarSelectedMoments" class="moments-feed" style="margin-top: 16px;"></div>
+        </section>
+
+        <!-- Locket Mode Widget Simulator (Hidden by default) -->
+        <section class="locket-simulator-wrap" id="locketView" style="display: none;" aria-label="Locket Widget Simulator">
+          <p style="color: var(--text-muted); font-size: 0.85rem; text-align: center;">
+            Simulating live lockscreen widget syncing with your closest circle.
+          </p>
+          <div class="locket-phone-mock" id="locketPhoneMock">
+            <div class="locket-notch"></div>
+            <div class="locket-lockscreen-time">
+              <div class="locket-clock" id="locketLiveClock">17:15</div>
+              <div class="locket-date" id="locketLiveDate">Sunday, October 4</div>
+            </div>
+            
+            <div class="locket-widget-box" id="locketWidgetContainer">
+              <!-- Dynamically populated with newest moment -->
+            </div>
+          </div>
+        </section>
+
+      </main>
+
+      <!-- Bottom Floating Dock -->
+      <footer class="bottom-dock" role="navigation" aria-label="Bottom Navigation">
+        <button class="dock-item active" id="dockFeedBtn" title="Feed">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor">
+            <rect x="3" y="3" width="7" height="7" rx="1.5"></rect>
+            <rect x="14" y="3" width="7" height="7" rx="1.5"></rect>
+            <rect x="14" y="14" width="7" height="7" rx="1.5"></rect>
+            <rect x="3" y="14" width="7" height="7" rx="1.5"></rect>
+          </svg>
+          <span>Feed</span>
+        </button>
+
+        <button class="dock-item" id="dockCalendarBtn" title="Memories">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor">
+            <rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect>
+            <line x1="16" y1="2" x2="16" y2="6"></line>
+            <line x1="8" y1="2" x2="8" y2="6"></line>
+            <line x1="3" y1="10" x2="21" y2="10"></line>
+          </svg>
+          <span>Memories</span>
+        </button>
+
+        <!-- Big Shutter Capture CTA -->
+        <button class="dock-snap-cta" id="dockCaptureBtn" aria-label="Capture Moment" title="Capture a Moment">
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"></path>
+            <circle cx="12" cy="13" r="4"></circle>
+          </svg>
+        </button>
+
+        <button class="dock-item" id="dockLocketBtn" title="Locket Mode">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor">
+            <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"></path>
+          </svg>
+          <span>Locket</span>
+        </button>
+
+        <button class="dock-item" id="dockSettingsBtn" title="Diary Settings">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor">
+            <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path>
+            <circle cx="12" cy="7" r="4"></circle>
+          </svg>
+          <span>You</span>
+        </button>
+      </footer>
+
+    </div>
+  </div>
+
+  <!-- Capture Moment Modal (Native HTML5 <dialog>) -->
+  <dialog class="nook-dialog" id="captureDialog">
+    <div class="modal-card">
+      <div class="modal-header">
+        <h3 class="modal-title">Capture Moment</h3>
+        <button class="btn-icon" id="btnCloseCapture" aria-label="Close">✕</button>
+      </div>
+
+      <div class="modal-body">
+        <!-- Live Viewfinder / Image Preview Box -->
+        <div class="camera-viewfinder-box" id="viewfinderBox">
+          <video id="cameraVideo" autoplay playsinline muted></video>
+          <img id="capturePreviewImg" alt="Preview" style="display: none;">
+          <canvas id="hiddenCanvas" style="display: none;"></canvas>
+
+          <div class="camera-grid-lines"></div>
+          <div class="reticle-bracket reticle-tl"></div>
+          <div class="reticle-bracket reticle-tr"></div>
+          <div class="reticle-bracket reticle-bl"></div>
+          <div class="reticle-bracket reticle-br"></div>
+          <div class="shutter-flash" id="shutterFlash"></div>
+
+          <!-- In-Camera Controls Bar -->
+          <div class="camera-controls-bar">
+            <button class="cam-aux-btn" id="btnUploadFile" title="Upload from photo library">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect>
+                <circle cx="8.5" cy="8.5" r="1.5"></circle>
+                <polyline points="21 15 16 10 5 21"></polyline>
+              </svg>
+            </button>
+            <input type="file" id="fileInput" accept="image/*" style="display: none;">
+
+            <button class="shutter-btn" id="btnShutterTrigger" aria-label="Snap photo" title="Snap photo"></button>
+
+            <button class="cam-aux-btn" id="btnSwitchCamera" title="Switch front/back camera">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M20 4v5h-5"></path>
+                <path d="M4 20v-5h5"></path>
+                <path d="M20.49 9A9 9 0 0 0 5.64 5.64L1 10m22 4l-4.64 4.36A9 9 0 0 1 3.51 15"></path>
+              </svg>
+            </button>
+          </div>
+        </div>
+
+        <!-- Filter Presets Strip -->
+        <div class="form-group">
+          <label class="form-label">Photo Aesthetic</label>
+          <div class="filter-carousel" id="filterCarousel">
+            <button class="filter-thumb-btn active" data-filter="none">
+              <div class="filter-swatch filter-none"></div>
+              <span>Original</span>
+            </button>
+            <button class="filter-thumb-btn" data-filter="warm">
+              <div class="filter-swatch filter-warm"></div>
+              <span>Warm Sun</span>
+            </button>
+            <button class="filter-thumb-btn" data-filter="noir">
+              <div class="filter-swatch filter-noir"></div>
+              <span>35mm Noir</span>
+            </button>
+            <button class="filter-thumb-btn" data-filter="vintage">
+              <div class="filter-swatch filter-vintage"></div>
+              <span>Vintage</span>
+            </button>
+            <button class="filter-thumb-btn" data-filter="cyber">
+              <div class="filter-swatch filter-cyber"></div>
+              <span>Cyber Neon</span>
+            </button>
+            <button class="filter-thumb-btn" data-filter="velvet">
+              <div class="filter-swatch filter-velvet"></div>
+              <span>Velvet</span>
+            </button>
+          </div>
+        </div>
+
+        <!-- Mood & Feeling Picker -->
+        <div class="form-group">
+          <label class="form-label">Mood / Vibe</label>
+          <div class="mood-picker-group" id="moodPickerGroup">
+            <button class="mood-chip-select selected" data-mood="🌅 Golden Hour">🌅 Golden Hour</button>
+            <button class="mood-chip-select" data-mood="☕ Cozy Vibes">☕ Cozy</button>
+            <button class="mood-chip-select" data-mood="🌿 Quiet Mind">🌿 Peaceful</button>
+            <button class="mood-chip-select" data-mood="⚡ Wild Energy">⚡ High Energy</button>
+            <button class="mood-chip-select" data-mood="💭 Deep Thoughts">💭 Reflective</button>
+            <button class="mood-chip-select" data-mood="🌙 Night Owl">🌙 Late Night</button>
+          </div>
+        </div>
+
+        <!-- Caption & Diary Note -->
+        <div class="form-group">
+          <label class="form-label" for="momentNoteInput">Moment Diary Note</label>
+          <textarea id="momentNoteInput" class="textarea-custom" placeholder="Write down what you felt in this exact second..."></textarea>
+        </div>
+
+        <!-- Location & Privacy Row -->
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
+          <div class="form-group">
+            <label class="form-label" for="momentLocationInput">Location</label>
+            <input type="text" id="momentLocationInput" class="comment-input" placeholder="e.g. Brooklyn Cafe" value="📍 Home Studio">
+          </div>
+          <div class="form-group">
+            <label class="form-label" for="momentPrivacySelect">Sharing</label>
+            <select id="momentPrivacySelect" class="comment-input" style="cursor: pointer;">
+              <option value="friends">👥 Close Friends</option>
+              <option value="private">🔒 Secret Diary Only</option>
+            </select>
+          </div>
+        </div>
+      </div>
+
+      <div class="modal-footer">
+        <button class="btn-secondary" id="btnCancelCapture">Cancel</button>
+        <button class="btn-primary" id="btnSaveMoment">Post to Diary ✨</button>
+      </div>
+    </div>
+  </dialog>
+
+  <!-- Settings & Backup Dialog -->
+  <dialog class="nook-dialog" id="settingsDialog">
+    <div class="modal-card">
+      <div class="modal-header">
+        <h3 class="modal-title">Nook Settings & Data</h3>
+        <button class="btn-icon" id="btnCloseSettings" aria-label="Close">✕</button>
+      </div>
+      <div class="modal-body">
+        <div style="display: flex; align-items: center; gap: 14px; padding-bottom: 12px; border-bottom: 1px solid var(--border-subtle);">
+          <div class="avatar" style="width: 52px; height: 52px; display: flex; align-items: center; justify-content: center; background: var(--gradient-brand); font-size: 1.4rem;">
+            📸
+          </div>
+          <div>
+            <h4 style="font-size: 1rem; font-weight: 700;">My Nook Diary</h4>
+            <p style="font-size: 0.8rem; color: var(--text-muted);" id="settingsStatsText">Loading moments...</p>
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label">Offline & Storage</label>
+          <p style="font-size: 0.82rem; color: var(--text-muted); line-height: 1.4;">
+            Nook currently stores all moments locally in your browser with offline PWA support. Your data never leaves your device.
+          </p>
+        </div>
+
+        <div style="display: flex; flex-direction: column; gap: 8px;">
+          <button class="btn-secondary" id="btnExportData" style="display: flex; align-items: center; justify-content: center; gap: 8px;">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+              <polyline points="7 10 12 15 17 10"></polyline>
+              <line x1="12" y1="15" x2="12" y2="3"></line>
+            </svg>
+            Export Backup (JSON)
+          </button>
+
+          <button class="btn-secondary" id="btnImportDataTrigger" style="display: flex; align-items: center; justify-content: center; gap: 8px;">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+              <polyline points="17 8 12 3 7 8"></polyline>
+              <line x1="12" y1="3" x2="12" y2="15"></line>
+            </svg>
+            Restore / Import Backup
+          </button>
+          <input type="file" id="importJsonInput" accept=".json" style="display: none;">
+
+          <button class="btn-secondary" id="btnResetSampleData" style="display: flex; align-items: center; justify-content: center; gap: 8px; color: var(--accent-amber);">
+            ↻ Restore Demo Moments
+          </button>
+
+          <button class="btn-secondary" id="btnClearAllMoments" style="display: flex; align-items: center; justify-content: center; gap: 8px; color: var(--accent-coral);">
+            🗑 Clear All Moments
+          </button>
+        </div>
+
+        <div class="form-group" style="margin-top: 8px;">
+          <label class="form-label">Roadmap: Friends Cloud Sync</label>
+          <p style="font-size: 0.78rem; color: var(--text-dim); line-height: 1.4;">
+            A real-time end-to-end encrypted backend (Supabase / Firebase) for private group lockscreen sharing is in active development.
+          </p>
+        </div>
+      </div>
+    </div>
+  </dialog>
+
+  <!-- Search Dialog -->
+  <dialog class="nook-dialog" id="searchDialog">
+    <div class="modal-card">
+      <div class="modal-header">
+        <h3 class="modal-title">Search Moments</h3>
+        <button class="btn-icon" id="btnCloseSearch" aria-label="Close">✕</button>
+      </div>
+      <div class="modal-body">
+        <input type="text" id="searchInput" class="comment-input" placeholder="Search by feeling, caption, place..." style="width: 100%;">
+        <div id="searchResultsFeed" class="moments-feed" style="margin-top: 14px;"></div>
+      </div>
+    </div>
+  </dialog>
+
+  <!-- Floating Toast Container -->
+  <div class="toast-container" id="toastContainer"></div>
+
+  <script src="app.js"></script>
+</body>
+</html>
