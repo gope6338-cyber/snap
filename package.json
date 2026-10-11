@@ -1,6 +1,6 @@
 {
   "name": "nook-moments-diary",
-  "version": "1.0.0",
+  "version": "1.5.0",
   "description": "Nook — An intimate moments diary and friends-only memory journal Progressive Web App (PWA)",
   "main": "index.html",
   "scripts": {

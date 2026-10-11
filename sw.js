@@ -1,5 +1,5 @@
 // Nook Moments Diary — Service Worker
-const CACHE_NAME = 'nook-cache-v1';
+const CACHE_NAME = 'nook-cache-v2';
 const ASSETS_TO_CACHE = [
   './',
   './index.html',

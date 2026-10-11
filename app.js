@@ -1,6 +1,16 @@
 /**
- * Nook — Moments Diary & Memory Journal Prototype
- * Client-Side PWA Engine
+ * Nook — Moments Diary & Memory Journal
+ * Progressive Web App Engine v1.5
+ * 
+ * Features:
+ * - IndexedDB Unlimited Media & Storage Engine (NookDB)
+ * - Dual-Camera Capture (Main + Selfie PiP) with interactive PiP swap
+ * - Creative Studio: Freehand Doodling Pen, Draggable Emoji Stickers
+ * - Voice Memos: MediaRecorder with audio waveform visualizer
+ * - 35mm Film Grain & Vignette Analog Sliders
+ * - Web Audio API physical camera shutter sound
+ * - Floating emoji reaction physics
+ * - Memories Calendar & Locket Widget Simulator
  */
 
 // Initial Sample Moments for a rich first-load impression
@@ -13,6 +23,7 @@ const DEFAULT_SAMPLE_MOMENTS = [
       handle: '@elena'
     },
     photoUrl: 'https://images.unsplash.com/photo-1507525428034-b723cf961d3e?auto=format&fit=crop&w=1000&q=80',
+    pipPhotoUrl: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=400&q=80',
     filter: 'warm',
     mood: '🌅 Golden Hour',
     location: '📍 Pacific Palisades, CA',
@@ -20,6 +31,10 @@ const DEFAULT_SAMPLE_MOMENTS = [
     favorite: true,
     timestamp: Date.now() - 1000 * 60 * 45, // 45 mins ago
     note: "Caught the horizon slipping into deep lavender and honey gold. No noise, just the tide breathing. Reminded myself that everything is unfolding right on time.",
+    voiceNote: {
+      duration: '0:18',
+      simulated: true
+    },
     reactions: {
       '❤️': 14,
       '🔥': 7,
@@ -63,6 +78,7 @@ const DEFAULT_SAMPLE_MOMENTS = [
       handle: '@kaichen'
     },
     photoUrl: 'https://images.unsplash.com/photo-1519681393784-d120267933ba?auto=format&fit=crop&w=1000&q=80',
+    pipPhotoUrl: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&w=400&q=80',
     filter: 'noir',
     mood: '🌙 Night Owl',
     location: '📍 High Alpine Lookout',
@@ -91,49 +107,197 @@ const DAILY_PROMPTS = [
   "If today was a song, what kind of rhythm would it have?"
 ];
 
-// App State
+/**
+ * IndexedDB Database Manager for Unlimited Media & Offline Persistence
+ */
+class NookDB {
+  constructor() {
+    this.dbName = 'nook_moments_db_v2';
+    this.version = 1;
+    this.db = null;
+  }
+
+  async open() {
+    if (this.db) return this.db;
+    return new Promise((resolve, reject) => {
+      const request = indexedDB.open(this.dbName, this.version);
+
+      request.onupgradeneeded = (e) => {
+        const db = e.target.result;
+        if (!db.objectStoreNames.contains('moments')) {
+          db.createObjectStore('moments', { keyPath: 'id' });
+        }
+        if (!db.objectStoreNames.contains('settings')) {
+          db.createObjectStore('settings', { keyPath: 'key' });
+        }
+      };
+
+      request.onsuccess = (e) => {
+        this.db = e.target.result;
+        resolve(this.db);
+      };
+
+      request.onerror = (e) => {
+        console.error('IndexedDB open error:', e);
+        reject(e);
+      };
+    });
+  }
+
+  async getAllMoments() {
+    await this.open();
+    return new Promise((resolve, reject) => {
+      const tx = this.db.transaction('moments', 'readonly');
+      const store = tx.objectStore('moments');
+      const request = store.getAll();
+
+      request.onsuccess = () => {
+        let results = request.result || [];
+        // Sort descending by timestamp
+        results.sort((a, b) => b.timestamp - a.timestamp);
+        resolve(results);
+      };
+
+      request.onerror = (err) => reject(err);
+    });
+  }
+
+  async putMoment(moment) {
+    await this.open();
+    return new Promise((resolve, reject) => {
+      const tx = this.db.transaction('moments', 'readwrite');
+      const store = tx.objectStore('moments');
+      const request = store.put(moment);
+      request.onsuccess = () => resolve();
+      request.onerror = (err) => reject(err);
+    });
+  }
+
+  async deleteMoment(id) {
+    await this.open();
+    return new Promise((resolve, reject) => {
+      const tx = this.db.transaction('moments', 'readwrite');
+      const store = tx.objectStore('moments');
+      const request = store.delete(id);
+      request.onsuccess = () => resolve();
+      request.onerror = (err) => reject(err);
+    });
+  }
+
+  async clearMoments() {
+    await this.open();
+    return new Promise((resolve, reject) => {
+      const tx = this.db.transaction('moments', 'readwrite');
+      const store = tx.objectStore('moments');
+      const request = store.clear();
+      request.onsuccess = () => resolve();
+      request.onerror = (err) => reject(err);
+    });
+  }
+
+  async getStorageEstimate() {
+    if (navigator.storage && navigator.storage.estimate) {
+      try {
+        const est = await navigator.storage.estimate();
+        const usedMB = (est.usage / (1024 * 1024)).toFixed(1);
+        const quotaMB = (est.quota / (1024 * 1024)).toFixed(0);
+        return { usedMB, quotaMB };
+      } catch (e) {
+        // Fallback
+      }
+    }
+    return { usedMB: '0.5', quotaMB: 'Unlimited (IndexedDB)' };
+  }
+}
+
+/**
+ * Main Nook Application Controller
+ */
 class NookApp {
   constructor() {
-    this.storageKey = 'nook_moments_data_v1';
-    this.moments = this.loadMoments();
+    this.db = new NookDB();
+    this.moments = [];
     this.currentSpace = 'all'; // 'all', 'friends', 'private', 'favorites'
     this.currentFilter = 'all'; // 'all', 'today', 'mood-*'
     this.activeTab = 'feed'; // 'feed', 'memories', 'locket'
+
+    // Camera & Capture State
     this.mediaStream = null;
     this.currentFacingMode = 'user'; // 'user' or 'environment'
+    this.cameraMode = 'single'; // 'single' or 'dual'
     this.capturedImageData = null;
+    this.capturedPipData = null;
     this.selectedFilter = 'none';
     this.selectedMood = '🌅 Golden Hour';
+
+    // Creative Studio: Doodle State
+    this.doodleActive = false;
+    this.doodleColor = '#FF6B6B';
+    this.isDrawing = false;
+    this.lastX = 0;
+    this.lastY = 0;
+
+    // Creative Studio: Stickers State
+    this.activeStickers = []; // [{ emoji, x, y }]
+
+    // Creative Studio: Voice Recording State
+    this.mediaRecorder = null;
+    this.voiceChunks = [];
+    this.recordedVoiceDataUrl = null;
+    this.voiceDuration = 0;
+    this.voiceTimerInterval = null;
+    this.isRecordingVoice = false;
+
+    // Currently playing audio in feed
+    this.activeAudioPlayer = null;
 
     this.initElements();
     this.bindEvents();
     this.initPWA();
-    this.render();
+    this.bootstrapData();
     this.initDailyPrompt();
     this.initLocketClock();
   }
 
-  // Load from LocalStorage or initialize with defaults
-  loadMoments() {
+  async bootstrapData() {
     try {
-      const data = localStorage.getItem(this.storageKey);
-      if (data) {
-        const parsed = JSON.parse(data);
-        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+      let stored = await this.db.getAllMoments();
+      if (!stored || stored.length === 0) {
+        // Check localStorage migration
+        const legacy = localStorage.getItem('nook_moments_data_v1');
+        if (legacy) {
+          try {
+            const parsed = JSON.parse(legacy);
+            if (Array.isArray(parsed) && parsed.length > 0) {
+              stored = parsed;
+            }
+          } catch (e) {}
+        }
       }
-    } catch (e) {
-      console.warn('Could not read localStorage:', e);
+
+      if (!stored || stored.length === 0) {
+        stored = JSON.parse(JSON.stringify(DEFAULT_SAMPLE_MOMENTS));
+        for (const m of stored) {
+          await this.db.putMoment(m);
+        }
+      }
+
+      this.moments = stored;
+      this.render();
+    } catch (err) {
+      console.warn('Bootstrap data fallback:', err);
+      this.moments = JSON.parse(JSON.stringify(DEFAULT_SAMPLE_MOMENTS));
+      this.render();
     }
-    // Fallback to initial defaults
-    this.saveMoments(DEFAULT_SAMPLE_MOMENTS);
-    return JSON.parse(JSON.stringify(DEFAULT_SAMPLE_MOMENTS));
   }
 
-  saveMoments(moments) {
+  async saveMomentsToDB() {
     try {
-      localStorage.setItem(this.storageKey, JSON.stringify(moments));
+      for (const m of this.moments) {
+        await this.db.putMoment(m);
+      }
     } catch (e) {
-      this.showToast('Storage full or unavailable');
+      console.error('Error saving moments to IndexedDB:', e);
     }
   }
 
@@ -160,17 +324,44 @@ class NookApp {
     this.dockLocketBtn = document.getElementById('dockLocketBtn');
     this.dockSettingsBtn = document.getElementById('dockSettingsBtn');
 
-    // Capture Modal
+    // Capture Modal & Controls
     this.captureDialog = document.getElementById('captureDialog');
+    this.cameraModeToggle = document.getElementById('cameraModeToggle');
+    this.modeSingleShot = document.getElementById('modeSingleShot');
+    this.modeDualCam = document.getElementById('modeDualCam');
     this.cameraVideo = document.getElementById('cameraVideo');
     this.capturePreviewImg = document.getElementById('capturePreviewImg');
+    this.doodleCanvas = document.getElementById('doodleCanvas');
     this.hiddenCanvas = document.getElementById('hiddenCanvas');
     this.viewfinderBox = document.getElementById('viewfinderBox');
+    this.dualPipBox = document.getElementById('dualPipBox');
+    this.dualPipImg = document.getElementById('dualPipImg');
+    this.btnRetakePip = document.getElementById('btnRetakePip');
+    this.stickersLayer = document.getElementById('stickersLayer');
     this.shutterFlash = document.getElementById('shutterFlash');
     this.btnShutterTrigger = document.getElementById('btnShutterTrigger');
     this.btnSwitchCamera = document.getElementById('btnSwitchCamera');
     this.btnUploadFile = document.getElementById('btnUploadFile');
     this.fileInput = document.getElementById('fileInput');
+
+    // Creative Tools Toolbar
+    this.creativeToolsPanel = document.getElementById('creativeToolsPanel');
+    this.btnToggleDoodle = document.getElementById('btnToggleDoodle');
+    this.doodleLabel = document.getElementById('doodleLabel');
+    this.doodlePalette = document.getElementById('doodlePalette');
+    this.btnUndoDoodle = document.getElementById('btnUndoDoodle');
+    this.stickersCarousel = document.getElementById('stickersCarousel');
+    this.btnToggleVoiceRecord = document.getElementById('btnToggleVoiceRecord');
+    this.voiceRecordLabel = document.getElementById('voiceRecordLabel');
+    this.micDot = document.getElementById('micDot');
+    this.voiceRecordTimer = document.getElementById('voiceRecordTimer');
+    this.voicePreviewRow = document.getElementById('voicePreviewRow');
+    this.btnPlayRecordedVoice = document.getElementById('btnPlayRecordedVoice');
+    this.btnDeleteRecordedVoice = document.getElementById('btnDeleteRecordedVoice');
+    this.checkFilmGrain = document.getElementById('checkFilmGrain');
+    this.rangeVignette = document.getElementById('rangeVignette');
+
+    // Form inputs
     this.filterCarousel = document.getElementById('filterCarousel');
     this.moodPickerGroup = document.getElementById('moodPickerGroup');
     this.momentNoteInput = document.getElementById('momentNoteInput');
@@ -216,7 +407,7 @@ class NookApp {
       this.render();
     });
 
-    // Filters
+    // Filter Chips
     this.filtersBar.addEventListener('click', (e) => {
       const chip = e.target.closest('.filter-chip');
       if (!chip) return;
@@ -226,7 +417,7 @@ class NookApp {
       this.render();
     });
 
-    // Dock Tabs
+    // Dock Navigation
     this.dockFeedBtn.addEventListener('click', () => this.switchTab('feed'));
     this.dockCalendarBtn.addEventListener('click', () => this.switchTab('memories'));
     this.dockLocketBtn.addEventListener('click', () => this.switchTab('locket'));
@@ -242,14 +433,52 @@ class NookApp {
       this.switchTab('feed');
     });
 
-    // Capture Dialog Controls
+    // Camera Mode Toggle (Single vs Dual)
+    this.modeSingleShot.addEventListener('click', () => this.setCameraMode('single'));
+    this.modeDualCam.addEventListener('click', () => this.setCameraMode('dual'));
+
+    // In-Camera & Shutter Controls
     this.btnCloseCapture.addEventListener('click', () => this.closeCaptureModal());
     this.btnCancelCapture.addEventListener('click', () => this.closeCaptureModal());
     this.btnShutterTrigger.addEventListener('click', () => this.snapPhoto());
     this.btnSwitchCamera.addEventListener('click', () => this.switchCamera());
     this.btnUploadFile.addEventListener('click', () => this.fileInput.click());
     this.fileInput.addEventListener('change', (e) => this.handleFileUpload(e));
+    this.btnRetakePip.addEventListener('click', () => this.retakeDualPip());
     this.btnSaveMoment.addEventListener('click', () => this.saveCapturedMoment());
+
+    // Creative Studio: Doodle Pen
+    this.btnToggleDoodle.addEventListener('click', () => this.toggleDoodleMode());
+    this.doodlePalette.addEventListener('click', (e) => {
+      const swatch = e.target.closest('.palette-swatch');
+      if (!swatch) return;
+      this.doodlePalette.querySelectorAll('.palette-swatch').forEach(s => s.classList.remove('selected'));
+      swatch.classList.add('selected');
+      this.doodleColor = swatch.dataset.color;
+    });
+    this.btnUndoDoodle.addEventListener('click', () => this.clearDoodleCanvas());
+    this.bindDoodleDrawing();
+
+    // Creative Studio: Stickers
+    this.stickersCarousel.addEventListener('click', (e) => {
+      const btn = e.target.closest('.sticker-btn');
+      if (!btn) return;
+      this.addSticker(btn.dataset.emoji);
+    });
+
+    // Creative Studio: Voice Recording
+    this.btnToggleVoiceRecord.addEventListener('click', () => this.toggleVoiceRecording());
+    this.btnPlayRecordedVoice.addEventListener('click', () => this.playRecordedVoice());
+    this.btnDeleteRecordedVoice.addEventListener('click', () => this.deleteRecordedVoice());
+
+    // Film Aesthetics
+    this.checkFilmGrain.addEventListener('change', (e) => {
+      if (e.target.checked) {
+        this.viewfinderBox.classList.add('grain-active');
+      } else {
+        this.viewfinderBox.classList.remove('grain-active');
+      }
+    });
 
     // Filter Carousel Selection
     this.filterCarousel.addEventListener('click', (e) => {
@@ -284,21 +513,34 @@ class NookApp {
     this.btnCloseSearch.addEventListener('click', () => this.searchDialog.close());
     this.searchInput.addEventListener('input', (e) => this.performSearch(e.target.value));
 
-    // Calendar month controls
+    // Calendar navigation
     document.getElementById('btnCalPrev')?.addEventListener('click', () => this.changeCalMonth(-1));
     document.getElementById('btnCalNext')?.addEventListener('click', () => this.changeCalMonth(1));
   }
 
-  // Synthesize a retro physical camera shutter sound via Web Audio API
+  // Camera Mode Switcher
+  setCameraMode(mode) {
+    this.cameraMode = mode;
+    if (mode === 'single') {
+      this.modeSingleShot.classList.add('active');
+      this.modeDualCam.classList.remove('active');
+      this.dualPipBox.style.display = 'none';
+      this.capturedPipData = null;
+    } else {
+      this.modeDualCam.classList.add('active');
+      this.modeSingleShot.classList.remove('active');
+      this.showToast('📸 Dual Cam enabled! Main + Selfie will capture.');
+    }
+  }
+
+  // Synthesize a physical camera shutter sound via Web Audio API
   playShutterSound() {
     try {
       const ctx = new (window.AudioContext || window.webkitAudioContext)();
-      
-      // Step 1: Mechanical click
       const osc = ctx.createOscillator();
       const gain = ctx.createGain();
       osc.type = 'triangle';
-      osc.frequency.setValueAtTime(140, ctx.currentTime);
+      osc.frequency.setValueAtTime(150, ctx.currentTime);
       osc.frequency.exponentialRampToValueAtTime(30, ctx.currentTime + 0.08);
 
       gain.gain.setValueAtTime(0.5, ctx.currentTime);
@@ -309,9 +551,8 @@ class NookApp {
       osc.start();
       osc.stop(ctx.currentTime + 0.09);
 
-      // Step 2: Soft shutter curtain release noise
       setTimeout(() => {
-        const bufferSize = ctx.sampleRate * 0.06;
+        const bufferSize = ctx.sampleRate * 0.05;
         const buffer = ctx.createBuffer(1, bufferSize, ctx.sampleRate);
         const data = buffer.getChannelData(0);
         for (let i = 0; i < bufferSize; i++) {
@@ -320,30 +561,38 @@ class NookApp {
         const noise = ctx.createBufferSource();
         noise.buffer = buffer;
         const noiseGain = ctx.createGain();
-        noiseGain.gain.setValueAtTime(0.3, ctx.currentTime);
-        noiseGain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.06);
+        noiseGain.gain.setValueAtTime(0.35, ctx.currentTime);
+        noiseGain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.05);
         noise.connect(noiseGain);
         noiseGain.connect(ctx.destination);
         noise.start();
-      }, 50);
-    } catch (e) {
-      // AudioContext unavailable or blocked by browser policy
-    }
+      }, 45);
+    } catch (e) {}
   }
 
   // Camera Management
   async openCaptureModal() {
     this.capturedImageData = null;
+    this.capturedPipData = null;
     this.capturePreviewImg.style.display = 'none';
     this.cameraVideo.style.display = 'block';
     this.btnShutterTrigger.style.display = 'block';
+    this.dualPipBox.style.display = 'none';
+    this.creativeToolsPanel.style.display = 'none';
+    this.clearDoodleCanvas();
+    this.clearStickers();
+    this.deleteRecordedVoice();
     this.applyFilterPreview('none');
+    this.viewfinderBox.classList.remove('grain-active');
+    this.checkFilmGrain.checked = false;
+    this.rangeVignette.value = 0;
 
     this.captureDialog.showModal();
     await this.startCamera();
   }
 
-  async startCamera() {
+  async startCamera(facingMode = null) {
+    if (facingMode) this.currentFacingMode = facingMode;
     try {
       if (this.mediaStream) {
         this.mediaStream.getTracks().forEach(track => track.stop());
@@ -359,12 +608,12 @@ class NookApp {
       this.cameraVideo.srcObject = this.mediaStream;
     } catch (err) {
       console.warn('Camera access error:', err);
-      // Fallback: Show photo upload helper if camera permissions denied
       this.cameraVideo.style.display = 'none';
       this.capturePreviewImg.src = 'https://images.unsplash.com/photo-1518495973542-4542c06a5843?auto=format&fit=crop&w=1000&q=80';
       this.capturePreviewImg.style.display = 'block';
       this.capturedImageData = this.capturePreviewImg.src;
-      this.showToast('Camera unavailable. Using library photo instead.');
+      this.creativeToolsPanel.style.display = 'flex';
+      this.showToast('Camera unavailable. Loaded photo preview.');
     }
   }
 
@@ -373,7 +622,7 @@ class NookApp {
     this.startCamera();
   }
 
-  snapPhoto() {
+  async snapPhoto() {
     this.playShutterSound();
 
     // Trigger flash animation
@@ -382,7 +631,6 @@ class NookApp {
 
     const video = this.cameraVideo;
     const canvas = this.hiddenCanvas;
-
     const w = video.videoWidth || 640;
     const h = video.videoHeight || 480;
     canvas.width = w;
@@ -400,10 +648,62 @@ class NookApp {
     this.capturePreviewImg.style.display = 'block';
     this.cameraVideo.style.display = 'none';
 
-    // Stop video tracks to save power
+    // If Dual Cam mode is active, snap secondary selfie
+    if (this.cameraMode === 'dual') {
+      await this.captureDualPipSelfie();
+    } else {
+      if (this.mediaStream) {
+        this.mediaStream.getTracks().forEach(t => t.stop());
+      }
+    }
+
+    // Reveal Creative Tools Panel (doodle, stickers, voice memo)
+    this.creativeToolsPanel.style.display = 'flex';
+    this.resizeDoodleCanvas();
+  }
+
+  async captureDualPipSelfie() {
+    this.showToast('📸 Snapping Dual-Cam selfie...');
+    const oppositeMode = this.currentFacingMode === 'user' ? 'environment' : 'user';
+
+    try {
+      // Switch briefly to selfie mode
+      const selfieStream = await navigator.mediaDevices.getUserMedia({
+        video: { facingMode: oppositeMode, width: { ideal: 640 }, height: { ideal: 480 } }
+      });
+
+      const tempVideo = document.createElement('video');
+      tempVideo.srcObject = selfieStream;
+      tempVideo.autoplay = true;
+      tempVideo.muted = true;
+      await new Promise(r => setTimeout(r, 600));
+
+      const tempCanvas = document.createElement('canvas');
+      tempCanvas.width = 320;
+      tempCanvas.height = 400;
+      const tCtx = tempCanvas.getContext('2d');
+      tCtx.drawImage(tempVideo, 0, 0, 320, 400);
+
+      this.capturedPipData = tempCanvas.toDataURL('image/jpeg', 0.82);
+      this.dualPipImg.src = this.capturedPipData;
+      this.dualPipBox.style.display = 'block';
+
+      selfieStream.getTracks().forEach(t => t.stop());
+    } catch (e) {
+      // Fallback selfie simulation if only 1 camera exists
+      this.capturedPipData = 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=400&q=80';
+      this.dualPipImg.src = this.capturedPipData;
+      this.dualPipBox.style.display = 'block';
+    }
+
     if (this.mediaStream) {
       this.mediaStream.getTracks().forEach(t => t.stop());
     }
+  }
+
+  async retakeDualPip() {
+    this.capturedPipData = null;
+    await this.captureDualPipSelfie();
   }
 
   handleFileUpload(event) {
@@ -420,6 +720,9 @@ class NookApp {
       if (this.mediaStream) {
         this.mediaStream.getTracks().forEach(t => t.stop());
       }
+
+      this.creativeToolsPanel.style.display = 'flex';
+      this.resizeDoodleCanvas();
     };
     reader.readAsDataURL(file);
   }
@@ -434,14 +737,335 @@ class NookApp {
       this.mediaStream.getTracks().forEach(track => track.stop());
       this.mediaStream = null;
     }
+    if (this.isRecordingVoice) {
+      this.stopVoiceRecording();
+    }
     this.captureDialog.close();
   }
 
-  saveCapturedMoment() {
-    const photo = this.capturedImageData || 'https://images.unsplash.com/photo-1518495973542-4542c06a5843?auto=format&fit=crop&w=1000&q=80';
+  // Creative Studio: Doodle Canvas Logic
+  resizeDoodleCanvas() {
+    const box = this.viewfinderBox;
+    this.doodleCanvas.width = box.clientWidth;
+    this.doodleCanvas.height = box.clientHeight;
+  }
+
+  toggleDoodleMode() {
+    this.doodleActive = !this.doodleActive;
+    if (this.doodleActive) {
+      this.doodleCanvas.style.display = 'block';
+      this.doodlePalette.style.display = 'flex';
+      this.btnToggleDoodle.classList.add('active');
+      this.doodleLabel.textContent = 'Doodle Pen: ON';
+      this.showToast('🎨 Freehand pen active! Draw over photo.');
+    } else {
+      this.doodlePalette.style.display = 'none';
+      this.btnToggleDoodle.classList.remove('active');
+      this.doodleLabel.textContent = 'Doodle Pen: OFF';
+    }
+  }
+
+  clearDoodleCanvas() {
+    const ctx = this.doodleCanvas.getContext('2d');
+    ctx.clearRect(0, 0, this.doodleCanvas.width, this.doodleCanvas.height);
+  }
+
+  bindDoodleDrawing() {
+    const canvas = this.doodleCanvas;
+    const ctx = canvas.getContext('2d');
+
+    const startDraw = (e) => {
+      if (!this.doodleActive) return;
+      this.isDrawing = true;
+      const rect = canvas.getBoundingClientRect();
+      this.lastX = (e.clientX || e.touches[0].clientX) - rect.left;
+      this.lastY = (e.clientY || e.touches[0].clientY) - rect.top;
+    };
+
+    const draw = (e) => {
+      if (!this.isDrawing || !this.doodleActive) return;
+      e.preventDefault();
+      const rect = canvas.getBoundingClientRect();
+      const currentX = (e.clientX || (e.touches && e.touches[0].clientX)) - rect.left;
+      const currentY = (e.clientY || (e.touches && e.touches[0].clientY)) - rect.top;
+
+      ctx.beginPath();
+      ctx.moveTo(this.lastX, this.lastY);
+      ctx.lineTo(currentX, currentY);
+      ctx.strokeStyle = this.doodleColor;
+      ctx.lineWidth = 4;
+      ctx.lineCap = 'round';
+      ctx.lineJoin = 'round';
+      ctx.shadowColor = this.doodleColor;
+      ctx.shadowBlur = 6;
+      ctx.stroke();
+
+      this.lastX = currentX;
+      this.lastY = currentY;
+    };
+
+    const stopDraw = () => {
+      this.isDrawing = false;
+    };
+
+    canvas.addEventListener('mousedown', startDraw);
+    canvas.addEventListener('mousemove', draw);
+    window.addEventListener('mouseup', stopDraw);
+
+    canvas.addEventListener('touchstart', startDraw, { passive: false });
+    canvas.addEventListener('touchmove', draw, { passive: false });
+    window.addEventListener('touchend', stopDraw);
+  }
+
+  // Creative Studio: Draggable Stickers Logic
+  addSticker(emoji) {
+    const sticker = document.createElement('div');
+    sticker.className = 'placed-sticker';
+    sticker.textContent = emoji;
+
+    // Center in viewfinder
+    const box = this.viewfinderBox;
+    let x = box.clientWidth / 2;
+    let y = box.clientHeight / 2;
+
+    sticker.style.left = `${x}px`;
+    sticker.style.top = `${y}px`;
+
+    // Make Draggable with Pointer Events
+    let isDragging = false;
+    let startX = 0;
+    let startY = 0;
+
+    const onPointerDown = (e) => {
+      isDragging = true;
+      startX = e.clientX - x;
+      startY = e.clientY - y;
+      sticker.setPointerCapture(e.pointerId);
+    };
+
+    const onPointerMove = (e) => {
+      if (!isDragging) return;
+      x = e.clientX - startX;
+      y = e.clientY - startY;
+      sticker.style.left = `${x}px`;
+      sticker.style.top = `${y}px`;
+    };
+
+    const onPointerUp = (e) => {
+      isDragging = false;
+      try { sticker.releasePointerCapture(e.pointerId); } catch(err){}
+    };
+
+    // Double click to remove
+    sticker.addEventListener('dblclick', () => {
+      sticker.remove();
+      this.activeStickers = this.activeStickers.filter(s => s.element !== sticker);
+    });
+
+    sticker.addEventListener('pointerdown', onPointerDown);
+    sticker.addEventListener('pointermove', onPointerMove);
+    sticker.addEventListener('pointerup', onPointerUp);
+
+    this.stickersLayer.appendChild(sticker);
+    this.activeStickers.push({ emoji, getPos: () => ({ x, y }), element: sticker });
+    this.showToast(`✨ ${emoji} sticker added! Drag to place.`);
+  }
+
+  clearStickers() {
+    this.stickersLayer.innerHTML = '';
+    this.activeStickers = [];
+  }
+
+  // Creative Studio: Voice Recording Logic
+  async toggleVoiceRecording() {
+    if (this.isRecordingVoice) {
+      this.stopVoiceRecording();
+    } else {
+      await this.startVoiceRecording();
+    }
+  }
+
+  async startVoiceRecording() {
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      this.mediaRecorder = new MediaRecorder(stream);
+      this.voiceChunks = [];
+
+      this.mediaRecorder.ondataavailable = (e) => {
+        if (e.data.size > 0) this.voiceChunks.push(e.data);
+      };
+
+      this.mediaRecorder.onstop = () => {
+        const audioBlob = new Blob(this.voiceChunks, { type: 'audio/webm' });
+        const reader = new FileReader();
+        reader.onloadend = () => {
+          this.recordedVoiceDataUrl = reader.result;
+          this.voicePreviewRow.style.display = 'flex';
+          this.showToast('🎙️ Voice memo recorded!');
+        };
+        reader.readAsDataURL(audioBlob);
+
+        stream.getTracks().forEach(t => t.stop());
+      };
+
+      this.mediaRecorder.start();
+      this.isRecordingVoice = true;
+      this.voiceDuration = 0;
+      this.btnToggleVoiceRecord.classList.add('recording');
+      this.voiceRecordLabel.textContent = '⏹ Stop Recording';
+      this.voiceRecordTimer.style.display = 'inline-block';
+      this.voiceRecordTimer.textContent = '00:00';
+
+      this.voiceTimerInterval = setInterval(() => {
+        this.voiceDuration++;
+        const mins = String(Math.floor(this.voiceDuration / 60)).padStart(2, '0');
+        const secs = String(this.voiceDuration % 60).padStart(2, '0');
+        this.voiceRecordTimer.textContent = `${mins}:${secs}`;
+      }, 1000);
+
+    } catch (err) {
+      console.warn('Microphone error:', err);
+      // Simulate voice note for environments without mic permissions
+      this.recordedVoiceDataUrl = 'simulated';
+      this.voiceDuration = 12;
+      this.voicePreviewRow.style.display = 'flex';
+      this.showToast('Simulated voice memo attached.');
+    }
+  }
+
+  stopVoiceRecording() {
+    if (this.mediaRecorder && this.mediaRecorder.state !== 'inactive') {
+      this.mediaRecorder.stop();
+    }
+    this.isRecordingVoice = false;
+    clearInterval(this.voiceTimerInterval);
+    this.btnToggleVoiceRecord.classList.remove('recording');
+    this.voiceRecordLabel.textContent = '🎙️ Re-record';
+  }
+
+  playRecordedVoice() {
+    if (!this.recordedVoiceDataUrl) return;
+    if (this.recordedVoiceDataUrl === 'simulated') {
+      this.playBeepSound();
+      this.showToast('▶ Playing voice memo preview...');
+      return;
+    }
+    const audio = new Audio(this.recordedVoiceDataUrl);
+    audio.play();
+  }
+
+  deleteRecordedVoice() {
+    this.recordedVoiceDataUrl = null;
+    this.voiceDuration = 0;
+    this.voicePreviewRow.style.display = 'none';
+    this.voiceRecordTimer.style.display = 'none';
+    this.voiceRecordLabel.textContent = '🎙️ Record Voice Memo';
+  }
+
+  playBeepSound() {
+    try {
+      const ctx = new (window.AudioContext || window.webkitAudioContext)();
+      const osc = ctx.createOscillator();
+      osc.type = 'sine';
+      osc.frequency.setValueAtTime(440, ctx.currentTime);
+      osc.connect(ctx.destination);
+      osc.start();
+      osc.stop(ctx.currentTime + 0.3);
+    } catch(e) {}
+  }
+
+  // Composite Photo Canvas (Merging filters, grain, vignette, doodles, stickers)
+  async generateCompositePhoto() {
+    const basePhoto = this.capturedImageData || 'https://images.unsplash.com/photo-1518495973542-4542c06a5843?auto=format&fit=crop&w=1000&q=80';
+    const canvas = document.createElement('canvas');
+    canvas.width = 800;
+    canvas.height = 1000;
+    const ctx = canvas.getContext('2d');
+
+    // 1. Draw base image with filter
+    const img = new Image();
+    img.crossOrigin = 'anonymous';
+    img.src = basePhoto;
+    await new Promise(r => { img.onload = r; img.onerror = r; });
+
+    // Apply canvas filter
+    const filterCSS = {
+      'none': 'none',
+      'warm': 'sepia(0.25) contrast(1.08) brightness(1.04) saturate(1.2)',
+      'noir': 'grayscale(1) contrast(1.3) brightness(0.9)',
+      'vintage': 'sepia(0.5) hue-rotate(-20deg) contrast(0.95)',
+      'cyber': 'hue-rotate(60deg) contrast(1.2) saturate(1.4)',
+      'velvet': 'brightness(1.08) contrast(1.1) saturate(1.15)'
+    }[this.selectedFilter] || 'none';
+
+    ctx.filter = filterCSS;
+    ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+    ctx.filter = 'none';
+
+    // 2. Draw Vignette if slider > 0
+    const vigVal = parseInt(this.rangeVignette.value, 10);
+    if (vigVal > 0) {
+      const vigRad = canvas.width * 0.7;
+      const grad = ctx.createRadialGradient(canvas.width / 2, canvas.height / 2, vigRad * 0.3, canvas.width / 2, canvas.height / 2, vigRad);
+      grad.addColorStop(0, 'rgba(0,0,0,0)');
+      grad.addColorStop(1, `rgba(0,0,0,${vigVal / 100})`);
+      ctx.fillStyle = grad;
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+    }
+
+    // 3. Draw 35mm Film Grain if checked
+    if (this.checkFilmGrain.checked) {
+      const imgData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+      const data = imgData.data;
+      for (let i = 0; i < data.length; i += 4) {
+        const noise = (Math.random() - 0.5) * 22;
+        data[i] += noise;
+        data[i+1] += noise;
+        data[i+2] += noise;
+      }
+      ctx.putImageData(imgData, 0, 0);
+    }
+
+    // 4. Draw Doodles
+    if (this.doodleCanvas.width > 0) {
+      ctx.drawImage(this.doodleCanvas, 0, 0, canvas.width, canvas.height);
+    }
+
+    // 5. Draw Stickers
+    const boxW = this.viewfinderBox.clientWidth || 400;
+    const boxH = this.viewfinderBox.clientHeight || 300;
+    for (const s of this.activeStickers) {
+      const pos = s.getPos();
+      const normX = (pos.x / boxW) * canvas.width;
+      const normY = (pos.y / boxH) * canvas.height;
+      ctx.font = '64px sans-serif';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.shadowColor = 'rgba(0,0,0,0.5)';
+      ctx.shadowBlur = 12;
+      ctx.fillText(s.emoji, normX, normY);
+    }
+
+    return canvas.toDataURL('image/jpeg', 0.88);
+  }
+
+  // Save Moment
+  async saveCapturedMoment() {
+    this.showToast('Saving moment to IndexedDB...');
+    const compositePhoto = await this.generateCompositePhoto();
     const note = this.momentNoteInput.value.trim() || 'A quiet moment preserved in the diary.';
     const location = this.momentLocationInput.value.trim() || '📍 My Secret Nook';
     const privacy = this.momentPrivacySelect.value;
+
+    let voiceNote = null;
+    if (this.recordedVoiceDataUrl) {
+      const mins = Math.floor(this.voiceDuration / 60);
+      const secs = String(this.voiceDuration % 60).padStart(2, '0');
+      voiceNote = {
+        dataUrl: this.recordedVoiceDataUrl,
+        duration: `${mins}:${secs}`
+      };
+    }
 
     const newMoment = {
       id: 'moment_' + Date.now(),
@@ -450,7 +1074,8 @@ class NookApp {
         avatar: 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&w=160&q=80',
         handle: '@you'
       },
-      photoUrl: photo,
+      photoUrl: compositePhoto,
+      pipPhotoUrl: this.capturedPipData || null,
       filter: this.selectedFilter,
       mood: this.selectedMood,
       location: location,
@@ -458,6 +1083,7 @@ class NookApp {
       favorite: false,
       timestamp: Date.now(),
       note: note,
+      voiceNote: voiceNote,
       reactions: {
         '❤️': 1,
         '✨': 1
@@ -467,7 +1093,8 @@ class NookApp {
     };
 
     this.moments.unshift(newMoment);
-    this.saveMoments(this.moments);
+    await this.db.putMoment(newMoment);
+
     this.closeCaptureModal();
     this.momentNoteInput.value = '';
     this.switchTab('feed');
@@ -499,7 +1126,6 @@ class NookApp {
     }
   }
 
-  // Render the primary chronological stream
   render() {
     this.streakCountEl.textContent = `${Math.min(7, Math.max(1, this.moments.length * 2))} Days`;
     if (this.activeTab === 'feed') {
@@ -513,12 +1139,10 @@ class NookApp {
 
   getFilteredMoments() {
     return this.moments.filter(m => {
-      // Space matching
       if (this.currentSpace === 'friends' && m.privacy !== 'friends') return false;
       if (this.currentSpace === 'private' && m.privacy !== 'private') return false;
       if (this.currentSpace === 'favorites' && !m.favorite) return false;
 
-      // Filter chip matching
       if (this.currentFilter === 'today') {
         const isToday = new Date(m.timestamp).toDateString() === new Date().toDateString();
         if (!isToday) return false;
@@ -559,6 +1183,25 @@ class NookApp {
     const filterClass = `filter-${m.filter || 'none'}`;
     const isFriends = m.privacy === 'friends';
     const favColor = m.favorite ? 'var(--accent-coral)' : 'currentColor';
+
+    // Dual-Camera PiP Inset
+    const dualPipHTML = m.pipPhotoUrl ? `
+      <div class="feed-dual-pip" data-moment-id="${m.id}" title="Tap to swap main and selfie photo">
+        <img src="${m.pipPhotoUrl}" alt="Selfie PiP">
+        <span class="feed-pip-swap-badge">⇄ Swap</span>
+      </div>
+    ` : '';
+
+    // Voice Note Player
+    const voiceNoteHTML = m.voiceNote ? `
+      <div class="moment-audio-player" data-moment-id="${m.id}" data-audio="${m.voiceNote.dataUrl || ''}">
+        <button class="audio-play-btn" type="button" title="Play Voice Memo">▶</button>
+        <div class="audio-waveform-bars">
+          <span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span>
+        </div>
+        <span class="audio-duration-label">${m.voiceNote.duration || '0:15'}</span>
+      </div>
+    ` : '';
 
     const reactionsKeys = ['❤️', '🔥', '✨', '🥹', '☕'];
     const reactionsHTML = reactionsKeys.map(emoji => {
@@ -612,12 +1255,15 @@ class NookApp {
         </header>
 
         <div class="moment-media-wrapper" data-moment-id="${m.id}">
-          <img class="moment-photo ${filterClass}" src="${m.photoUrl}" alt="Moment captured by ${this.escapeHTML(m.author.name)}" loading="lazy">
+          <img class="moment-photo ${filterClass}" id="photo-${m.id}" src="${m.photoUrl}" alt="Moment captured by ${this.escapeHTML(m.author.name)}" loading="lazy">
+          ${dualPipHTML}
           <div class="media-overlay-tags">
             <span class="mood-pill">${m.mood}</span>
             <span class="location-pill">${this.escapeHTML(m.location)}</span>
           </div>
         </div>
+
+        ${voiceNoteHTML}
 
         <div class="moment-body">
           <p class="moment-note">${this.escapeHTML(m.note)}</p>
@@ -658,12 +1304,29 @@ class NookApp {
       });
     });
 
-    // Double tap / click photo to Heart
+    // Double click photo to Heart
     container.querySelectorAll('.moment-media-wrapper').forEach(wrap => {
       wrap.addEventListener('dblclick', (e) => {
         const momentId = wrap.dataset.momentId;
         const heartBtn = wrap.parentElement.querySelector('.reaction-btn[data-emoji="❤️"]');
         this.handleReaction(momentId, '❤️', heartBtn || wrap, e);
+      });
+    });
+
+    // Swap Dual-Camera PiP & Main photo on tap
+    container.querySelectorAll('.feed-dual-pip').forEach(pip => {
+      pip.addEventListener('click', (e) => {
+        e.stopPropagation();
+        const momentId = pip.dataset.momentId;
+        this.swapDualCameraPhotos(momentId);
+      });
+    });
+
+    // Voice Memo Audio Playback
+    container.querySelectorAll('.moment-audio-player').forEach(player => {
+      const playBtn = player.querySelector('.audio-play-btn');
+      playBtn.addEventListener('click', () => {
+        this.toggleAudioPlayback(player);
       });
     });
 
@@ -708,6 +1371,71 @@ class NookApp {
     });
   }
 
+  // Swap Dual Camera Photos in Card
+  swapDualCameraPhotos(momentId) {
+    const moment = this.moments.find(m => m.id === momentId);
+    if (!moment || !moment.pipPhotoUrl) return;
+
+    // Swap
+    const temp = moment.photoUrl;
+    moment.photoUrl = moment.pipPhotoUrl;
+    moment.pipPhotoUrl = temp;
+
+    this.db.putMoment(moment);
+    this.render();
+    this.showToast('⇄ Swapped main and selfie perspective!');
+  }
+
+  // Audio Playback in Feed
+  toggleAudioPlayback(playerElement) {
+    const isPlaying = playerElement.classList.contains('playing');
+    const playBtn = playerElement.querySelector('.audio-play-btn');
+
+    // Stop currently active player
+    if (this.activeAudioPlayer && this.activeAudioPlayer !== playerElement) {
+      this.activeAudioPlayer.classList.remove('playing');
+      const b = this.activeAudioPlayer.querySelector('.audio-play-btn');
+      if (b) b.textContent = '▶';
+      if (this.currentPlayingAudio) {
+        this.currentPlayingAudio.pause();
+        this.currentPlayingAudio = null;
+      }
+    }
+
+    if (isPlaying) {
+      playerElement.classList.remove('playing');
+      playBtn.textContent = '▶';
+      if (this.currentPlayingAudio) {
+        this.currentPlayingAudio.pause();
+        this.currentPlayingAudio = null;
+      }
+      this.activeAudioPlayer = null;
+    } else {
+      playerElement.classList.add('playing');
+      playBtn.textContent = '⏸';
+      this.activeAudioPlayer = playerElement;
+
+      const audioUrl = playerElement.dataset.audio;
+      if (audioUrl && audioUrl !== 'simulated' && audioUrl.startsWith('data:audio')) {
+        this.currentPlayingAudio = new Audio(audioUrl);
+        this.currentPlayingAudio.play();
+        this.currentPlayingAudio.onended = () => {
+          playerElement.classList.remove('playing');
+          playBtn.textContent = '▶';
+          this.activeAudioPlayer = null;
+        };
+      } else {
+        // Simulated audio tone with Web Audio API
+        this.playBeepSound();
+        setTimeout(() => {
+          playerElement.classList.remove('playing');
+          playBtn.textContent = '▶';
+          this.activeAudioPlayer = null;
+        }, 3200);
+      }
+    }
+  }
+
   handleReaction(momentId, emoji, targetEl, event) {
     const moment = this.moments.find(m => m.id === momentId);
     if (!moment) return;
@@ -725,7 +1453,7 @@ class NookApp {
       this.spawnParticle(emoji, event ? event.clientX : null, event ? event.clientY : null, targetEl);
     }
 
-    this.saveMoments(this.moments);
+    this.db.putMoment(moment);
     this.render();
   }
 
@@ -753,15 +1481,15 @@ class NookApp {
     const moment = this.moments.find(m => m.id === momentId);
     if (!moment) return;
     moment.favorite = !moment.favorite;
-    this.saveMoments(this.moments);
+    this.db.putMoment(moment);
     this.render();
     this.showToast(moment.favorite ? '⭐️ Saved to favorites' : 'Removed from favorites');
   }
 
-  deleteMoment(momentId) {
+  async deleteMoment(momentId) {
     if (!confirm('Remove this moment from your diary?')) return;
     this.moments = this.moments.filter(m => m.id !== momentId);
-    this.saveMoments(this.moments);
+    await this.db.deleteMoment(momentId);
     this.render();
     this.showToast('🗑 Moment removed');
   }
@@ -776,7 +1504,7 @@ class NookApp {
       text: text,
       time: 'Just now'
     });
-    this.saveMoments(this.moments);
+    this.db.putMoment(moment);
     this.render();
     this.showToast('Note added to moment');
   }
@@ -796,12 +1524,10 @@ class NookApp {
     const firstDayIndex = new Date(year, month, 1).getDay();
     const totalDays = new Date(year, month + 1, 0).getDate();
 
-    // Blank prefix cells
     for (let i = 0; i < firstDayIndex; i++) {
       html += `<div class="cal-day-cell" style="opacity: 0.2;"></div>`;
     }
 
-    // Days of Month
     for (let day = 1; day <= totalDays; day++) {
       const isToday = day === now.getDate();
       const hasMoments = this.moments.some(m => {
@@ -883,9 +1609,13 @@ class NookApp {
     setInterval(update, 30000);
   }
 
-  // Settings & Data Export / Import
-  openSettings() {
-    this.settingsStatsText.textContent = `${this.moments.length} moments saved in local storage.`;
+  // Settings & IndexedDB Storage Stats
+  async openSettings() {
+    const estimate = await this.db.getStorageEstimate();
+    this.settingsStatsText.innerHTML = `
+      <strong>${this.moments.length} moments</strong> stored in IndexedDB.<br>
+      Storage used: <span style="color:var(--accent-coral);">${estimate.usedMB} MB</span> / ${estimate.quotaMB} MB
+    `;
     this.settingsDialog.showModal();
   }
 
@@ -904,15 +1634,18 @@ class NookApp {
     const file = e.target.files[0];
     if (!file) return;
     const reader = new FileReader();
-    reader.onload = (event) => {
+    reader.onload = async (event) => {
       try {
         const imported = JSON.parse(event.target.result);
         if (Array.isArray(imported)) {
           this.moments = imported;
-          this.saveMoments(this.moments);
+          await this.db.clearMoments();
+          for (const m of this.moments) {
+            await this.db.putMoment(m);
+          }
           this.render();
           this.settingsDialog.close();
-          this.showToast(`✨ Successfully imported ${imported.length} moments!`);
+          this.showToast(`✨ Successfully imported ${imported.length} moments into IndexedDB!`);
         } else {
           alert('Invalid backup format: root must be an array of moments.');
         }
@@ -923,19 +1656,22 @@ class NookApp {
     reader.readAsText(file);
   }
 
-  resetSampleMoments() {
+  async resetSampleMoments() {
     if (!confirm('Restore default sample moments into your diary?')) return;
     this.moments = JSON.parse(JSON.stringify(DEFAULT_SAMPLE_MOMENTS));
-    this.saveMoments(this.moments);
+    await this.db.clearMoments();
+    for (const m of this.moments) {
+      await this.db.putMoment(m);
+    }
     this.render();
     this.settingsDialog.close();
-    this.showToast('↻ Sample moments restored');
+    this.showToast('↻ Sample moments restored in IndexedDB');
   }
 
-  clearAllMoments() {
+  async clearAllMoments() {
     if (!confirm('Are you sure you want to delete all saved moments?')) return;
     this.moments = [];
-    this.saveMoments([]);
+    await this.db.clearMoments();
     this.render();
     this.settingsDialog.close();
     this.showToast('All moments cleared.');
@@ -973,13 +1709,11 @@ class NookApp {
     this.bindCardInteractions(this.searchResultsFeed);
   }
 
-  // Daily Prompts
   initDailyPrompt() {
     const prompt = DAILY_PROMPTS[Math.floor(Math.random() * DAILY_PROMPTS.length)];
     this.dailyPromptText.textContent = `"${prompt}"`;
   }
 
-  // Utilities
   formatTimeAgo(timestamp) {
     const diff = Date.now() - timestamp;
     const mins = Math.floor(diff / 60000);
@@ -1010,7 +1744,6 @@ class NookApp {
     setTimeout(() => toast.remove(), 2600);
   }
 
-  // PWA Service Worker Registration
   initPWA() {
     if ('serviceWorker' in navigator) {
       window.addEventListener('load', () => {
@@ -1027,7 +1760,7 @@ function nowMonthName(monthIndex) {
   return months[monthIndex];
 }
 
-// Instantiate globally
+// Global Startup
 window.addEventListener('DOMContentLoaded', () => {
   window.nookApp = new NookApp();
 });

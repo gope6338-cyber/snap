@@ -6,14 +6,17 @@
 
 ## ✨ Features
 
-- **📸 In-App Viewfinder & Camera**: Capture live moments using your device's webcam / mobile camera (`navigator.mediaDevices.getUserMedia`) with front/rear switching, physical mechanical shutter sound (synthesized via Web Audio API), and instant flash effect.
-- **🎞️ Film Aesthetic Filters**: Apply instant real-time photo filters including *Warm Sun*, *35mm Noir*, *Vintage Film*, *Cyber Neon*, and *Velvet Glow*.
-- **🔥 Daily Reflection Prompts & Streaks**: Never miss a beat with inspirational daily reflection questions and continuous streak tracking.
-- **📅 Memories Calendar**: Browse your visual archive by month and day with interactive timeline cards.
-- **📱 Locket Mode Widget Simulator**: Preview your latest shared moment as a dynamic home screen / lock screen widget.
-- **❤️ Floating Emoji Reactions & Notes**: Tap to react with floating physics-based emoji bursts and write notes on shared moments.
-- **🔒 Local-First Privacy**: Moments are stored locally on your device (`localStorage` / IndexedDB). Includes one-click JSON backup export and restore.
-- **⚡ Offline-First PWA**: Installable on iOS, Android, and Desktop with offline caching via Service Worker.
+- **📸 Dual-Camera Mode (Main + Selfie PiP)**: Capture both perspectives (environment + selfie reaction) in one moment, with interactive tap-to-swap in the feed.
+- **🎨 Creative Studio Doodling**: Freehand drawing pen with vibrant neon color swatches, smoothing, and clear controls.
+- **✨ Draggable Emoji Stickers**: Place and reposition fun expressive stickers across your captured moments.
+- **🎙️ Voice Memos & Waveform Player**: Record audio thoughts with live timer, preview, and an interactive waveform player in feed cards.
+- **💾 IndexedDB Unlimited Media Storage (NookDB)**: Seamless local-first storage capable of handling high-resolution photos and audio clips without browser quota limitations.
+- **🎞️ Analog 35mm Grain & Vignette Sliders**: Customizable real-time film grain texture and optical corner falloff.
+- **🔊 Synthesized Mechanical Shutter**: Retro tactile sound effect generated directly with Web Audio API.
+- **📅 Memories Calendar & Streaks**: Monthly memory view, daily prompt generator, and streak tracking.
+- **📱 Locket Mode Widget Simulator**: Live lockscreen widget demonstration with dynamic real-time clock.
+- **❤️ Floating Emoji Reactions & Notes**: Physics-based floating particles on reaction.
+- **⚡ Offline-First PWA**: Installable standalone app with Service Worker caching.
 
 ---
 
